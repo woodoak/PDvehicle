@@ -1,6 +1,6 @@
 // Supabase の URL と anon key をここに
 const SUPABASE_URL = 'https://epdojmebklfrfnvycqcp.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_Y7qM1t5qnp3a7bCGQpcgJA_drSUEAoV';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZG9qbWVia2xmcmZudnljcWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM3MDUsImV4cCI6MjA4Nzg1OTcwNX0.IM6N3l2cJuCxOZdcEljaq9vhbCu_3lCgWR6LgHhYlCI';
 
 const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
