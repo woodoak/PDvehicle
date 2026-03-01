@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>PD 車両管理</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    .member-row { border: 1px solid #ccc; margin: 8px 0; padding: 8px; }
+    .vehicle-block { display: flex; align-items: center; gap: 4px; margin: 2px 0; }
+    button { width: 24px; height: 24px; }
+    input[type="number"] { width: 60px; }
+  </style>
+</head>
+<body>
+  <h1>PD 車両管理</h1>
+
+  <div>
+    <h2>名簿</h2>
+    <button id="add-member">＋ 名簿追加</button>
+    <div id="members-container"></div>
+  </div>
+
+  <div>
+    <h2>車両マスタ</h2>
+    <button id="add-vehicle">＋ 車両追加</button>
+    <div id="vehicles-container"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
