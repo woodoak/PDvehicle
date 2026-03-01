@@ -1,52 +1,71 @@
-// Supabase の URL と anon key をここに
+// =============================
+// Supabase 設定
+// =============================
 const SUPABASE_URL = 'https://epdojmebklfrfnvycqcp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwZG9qbWVia2xmcmZudnljcWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM3MDUsImV4cCI6MjA4Nzg1OTcwNX0.IM6N3l2cJuCxOZdcEljaq9vhbCu_3lCgWR6LgHhYlCI';
 
-const { createClient } = supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const headers = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json'
+};
+
+// =============================
+// 変数
+// =============================
+let vehicles = [];
+let members = [];
 
 const membersContainer = document.getElementById('members-container');
 const addMemberBtn = document.getElementById('add-member');
 
-let vehicles = [];
-let members = [];
-
+// =============================
 // 初期ロード
+// =============================
 window.addEventListener('load', async () => {
   await loadVehicles();
   await loadMembers();
 });
 
-// 車両一覧取得
+// =============================
+// Vehicles 取得
+// =============================
 async function loadVehicles() {
-  const { data, error } = await supabaseClient
-    .from('vehicles')
-    .select('*')
-    .order('name', { ascending: true });
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/vehicles?select=*&order=name.asc`,
+    { headers }
+  );
 
-  if (error) {
-    console.error(error);
+  if (!res.ok) {
+    console.error(await res.text());
     return;
   }
-  vehicles = data;
+
+  vehicles = await res.json();
   renderVehiclesMaster();
 }
 
-// 名簿一覧取得
+// =============================
+// Members 取得
+// =============================
 async function loadMembers() {
-  const { data, error } = await supabaseClient
-    .from('members')
-    .select('id, name');
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/members?select=id,name`,
+    { headers }
+  );
 
-  if (error) {
-    console.error(error);
+  if (!res.ok) {
+    console.error(await res.text());
     return;
   }
-  members = data;
+
+  members = await res.json();
   renderMembers();
 }
 
-// 名簿表示（1人ごとに車両リスト＋ボタン）
+// =============================
+// 名簿表示
+// =============================
 async function renderMembers() {
   membersContainer.innerHTML = '';
 
@@ -57,44 +76,51 @@ async function renderMembers() {
     // 名前編集
     const nameInput = document.createElement('input');
     nameInput.value = member.name || '';
-    nameInput.addEventListener('change', () => updateMemberName(member.id, nameInput.value));
+    nameInput.addEventListener('change', () =>
+      updateMemberName(member.id, nameInput.value)
+    );
     wrapper.appendChild(nameInput);
 
-    // 削除ボタン
+    // 削除
     const delBtn = document.createElement('button');
     delBtn.textContent = '削除';
     delBtn.onclick = () => deleteMember(member.id);
     wrapper.appendChild(delBtn);
 
-    // 車両ごとの台数
-    const list = document.createElement('div');
+    // 所有数取得
+    const countRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/member_vehicle_counts?select=vehicle_id,count&member_id=eq.${member.id}`,
+      { headers }
+    );
 
-    // 所有数をまとめて取得
-    const { data: counts } = await supabaseClient
-      .from('member_vehicle_counts')
-      .select('vehicle_id, count')
-      .eq('member_id', member.id);
-
+    const counts = await countRes.json();
     const countMap = {};
-    (counts || []).forEach(c => { countMap[c.vehicle_id] = c.count; });
+    (counts || []).forEach(c => {
+      countMap[c.vehicle_id] = c.count;
+    });
+
+    const list = document.createElement('div');
 
     vehicles.forEach(vehicle => {
       const block = document.createElement('div');
       block.className = 'vehicle-block';
 
-      // 車両名編集
+      // 車両名
       const vNameInput = document.createElement('input');
       vNameInput.value = vehicle.name;
-      vNameInput.addEventListener('change', () => updateVehicleName(vehicle.id, vNameInput.value));
+      vNameInput.addEventListener('change', () =>
+        updateVehicleName(vehicle.id, vNameInput.value)
+      );
       block.appendChild(vNameInput);
 
-      // マイナスボタン
+      // − ボタン
       const minusBtn = document.createElement('button');
       minusBtn.textContent = '-';
-      minusBtn.onclick = () => changeCount(member.id, vehicle.id, -1);
+      minusBtn.onclick = () =>
+        changeCount(member.id, vehicle.id, -1);
       block.appendChild(minusBtn);
 
-      // 数値入力
+      // 数値
       const numInput = document.createElement('input');
       numInput.type = 'number';
       numInput.value = countMap[vehicle.id] || 0;
@@ -103,10 +129,11 @@ async function renderMembers() {
       );
       block.appendChild(numInput);
 
-      // プラスボタン
+      // ＋ ボタン
       const plusBtn = document.createElement('button');
       plusBtn.textContent = '+';
-      plusBtn.onclick = () => changeCount(member.id, vehicle.id, 1);
+      plusBtn.onclick = () =>
+        changeCount(member.id, vehicle.id, 1);
       block.appendChild(plusBtn);
 
       list.appendChild(block);
@@ -117,120 +144,181 @@ async function renderMembers() {
   }
 }
 
-// 名簿追加
+// =============================
+// メンバー追加
+// =============================
 addMemberBtn.addEventListener('click', async () => {
   const name = prompt('名前を入力してください');
   if (!name) return;
 
-  const { data, error } = await supabaseClient
-    .from('members')
-    .insert({ name })
-    .select()
-    .single();
+  await fetch(`${SUPABASE_URL}/rest/v1/members`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name })
+  });
 
-  if (error) {
-    console.error(error);
-    return;
-  }
-  members.push(data);
-  renderMembers();
+  await loadMembers();
 });
 
-// 名簿名変更
+// =============================
+// 名前変更
+// =============================
 async function updateMemberName(id, name) {
-  await supabaseClient.from('members').update({ name }).eq('id', id);
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/members?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ name })
+    }
+  );
 }
 
-// 名簿削除
+// =============================
+// メンバー削除
+// =============================
 async function deleteMember(id) {
-  await supabaseClient.from('member_vehicle_counts').delete().eq('member_id', id);
-  await supabaseClient.from('members').delete().eq('id', id);
-  members = members.filter(m => m.id !== id);
-  renderMembers();
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/member_vehicle_counts?member_id=eq.${id}`,
+    { method: 'DELETE', headers }
+  );
+
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/members?id=eq.${id}`,
+    { method: 'DELETE', headers }
+  );
+
+  await loadMembers();
 }
 
+// =============================
 // 車両名変更
+// =============================
 async function updateVehicleName(id, name) {
-  await supabaseClient.from('vehicles').update({ name }).eq('id', id);
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/vehicles?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ name })
+    }
+  );
+
   await loadVehicles();
   await renderMembers();
 }
 
-// 台数を±1
+// =============================
+// 台数変更 ±1
+// =============================
 async function changeCount(memberId, vehicleId, diff) {
-  const { data } = await supabaseClient
-    .from('member_vehicle_counts')
-    .select('id, count')
-    .eq('member_id', memberId)
-    .eq('vehicle_id', vehicleId)
-    .maybeSingle();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/member_vehicle_counts?member_id=eq.${memberId}&vehicle_id=eq.${vehicleId}`,
+    { headers }
+  );
 
+  const data = await res.json();
   let newCount = diff;
-  if (data) newCount = (data.count || 0) + diff;
-  if (newCount < 0) newCount = 0;
 
-  if (!data) {
-    await supabaseClient.from('member_vehicle_counts').insert({
-      member_id: memberId,
-      vehicle_id: vehicleId,
-      count: newCount,
-    });
+  if (data.length > 0) {
+    newCount = (data[0].count || 0) + diff;
+    if (newCount < 0) newCount = 0;
+
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/member_vehicle_counts?id=eq.${data[0].id}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ count: newCount })
+      }
+    );
   } else {
-    await supabaseClient
-      .from('member_vehicle_counts')
-      .update({ count: newCount })
-      .eq('id', data.id);
+    if (newCount < 0) newCount = 0;
+
+    await fetch(`${SUPABASE_URL}/rest/v1/member_vehicle_counts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        member_id: memberId,
+        vehicle_id: vehicleId,
+        count: newCount
+      })
+    });
   }
+
   await renderMembers();
 }
 
-// 台数を直接セット
+// =============================
+// 台数直接セット
+// =============================
 async function setCount(memberId, vehicleId, value) {
   if (value < 0) value = 0;
 
-  const { data } = await supabaseClient
-    .from('member_vehicle_counts')
-    .select('id')
-    .eq('member_id', memberId)
-    .eq('vehicle_id', vehicleId)
-    .maybeSingle();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/member_vehicle_counts?member_id=eq.${memberId}&vehicle_id=eq.${vehicleId}`,
+    { headers }
+  );
 
-  if (!data) {
-    await supabaseClient.from('member_vehicle_counts').insert({
-      member_id: memberId,
-      vehicle_id: vehicleId,
-      count: value,
-    });
+  const data = await res.json();
+
+  if (data.length > 0) {
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/member_vehicle_counts?id=eq.${data[0].id}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ count: value })
+      }
+    );
   } else {
-    await supabaseClient
-      .from('member_vehicle_counts')
-      .update({ count: value })
-      .eq('id', data.id);
+    await fetch(`${SUPABASE_URL}/rest/v1/member_vehicle_counts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        member_id: memberId,
+        vehicle_id: vehicleId,
+        count: value
+      })
+    });
   }
 }
 
-// 車両マスタ表示（追加・削除用の簡易UI）
+// =============================
+// 車両マスタ表示
+// =============================
 function renderVehiclesMaster() {
   const container = document.getElementById('vehicles-container');
   container.innerHTML = '';
 
   vehicles.forEach(v => {
     const row = document.createElement('div');
+
     const input = document.createElement('input');
     input.value = v.name;
-    input.addEventListener('change', () => updateVehicleName(v.id, input.value));
+    input.addEventListener('change', () =>
+      updateVehicleName(v.id, input.value)
+    );
     row.appendChild(input);
 
     const del = document.createElement('button');
     del.textContent = '削除';
     del.onclick = async () => {
-      await supabaseClient.from('member_vehicle_counts').delete().eq('vehicle_id', v.id);
-      await supabaseClient.from('vehicles').delete().eq('id', v.id);
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/member_vehicle_counts?vehicle_id=eq.${v.id}`,
+        { method: 'DELETE', headers }
+      );
+
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/vehicles?id=eq.${v.id}`,
+        { method: 'DELETE', headers }
+      );
+
       await loadVehicles();
       await renderMembers();
     };
-    row.appendChild(del);
 
+    row.appendChild(del);
     container.appendChild(row);
   });
 
@@ -238,7 +326,13 @@ function renderVehiclesMaster() {
   addBtn.onclick = async () => {
     const name = prompt('車両名を入力してください');
     if (!name) return;
-    await supabaseClient.from('vehicles').insert({ name });
+
+    await fetch(`${SUPABASE_URL}/rest/v1/vehicles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name })
+    });
+
     await loadVehicles();
     await renderMembers();
   };
